@@ -1,0 +1,74 @@
+services:
+  #Container personalizado
+  app:
+    build:
+      args:
+        user: marcelo
+        uid: 1000
+      context: ./
+      dockerfile: Dockerfile
+    image: marcelolinck/laravel-app
+    working_dir: /var/www
+    volumes:
+      - ./:/var/www/
+    #sempre que parar ele restarta
+    restart: unless-stopped
+    depends_on:
+      - redis
+      - queue
+    networks:
+      - docker-laravel
+
+  #subindo o nginx
+  nginx:
+    image: nginx:alpine
+    restart: always
+    ports:
+      - 80:80
+    volumes:
+      - ./:/var/www
+      - ./docker/nginx:/etc/nginx/conf.d/
+    networks:
+      - docker-laravel
+
+  mysql:
+    image: mysql
+    restart: always
+    ports:
+      - 3307:3306
+    volumes:
+      - /.docker/mysql:/var/lib/mysql
+    environment:
+      MYSQL_DATABASE: ${DB_DATABASE}
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
+    # MYSQL_USER: ${DB_USERNAME}
+    #MYSQL_PASSWORD: ${DB_PASSWORD}
+    networks:
+      - docker-laravel
+
+  #Agora subindo o redis
+  redis:
+    image: redis:latest
+    networks:
+      - docker-laravel
+
+  #filas de processos
+  queue:
+    build:
+      args:
+        user: marcelo
+        uid: 1000
+      context: ./
+      dockerfile: Dockerfile
+    restart: always
+    command: "php artisan queue:work"
+    depends_on:
+      - redis
+    volumes:
+      - ./:/var/www
+    networks:
+      - docker-laravel
+
+networks:
+  docker-laravel:
+    driver: bridge
